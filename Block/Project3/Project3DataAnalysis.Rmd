@@ -1,0 +1,568 @@
+---
+title: "Project 3 Dataset Analysis"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE, echo=FALSE, cache=TRUE, message=FALSE}
+r = getOption("repos")
+r["CRAN"] = "http://cran.us.r-project.org"
+options(repos = r)
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE)
+rm(list = ls())
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+install.packages("dslabs")
+install.packages("data.table")
+install.packages("magrittr")
+install.packages("tidyr")
+install.packages("dplyr")
+install.packages("ggplot2")
+install.packages("rlang")
+install.packages("ggrepel")
+install.packages("rmarkdown")
+install.packages("dabestr")
+install.packages("VennDiagram")
+BiocManager::install("vsn")
+BiocManager::install("recount3", force = TRUE)
+BiocManager::install("ReportingTools")
+BiocManager::install("DESeq2")
+BiocManager::install("GSEABase")
+BiocManager::install("apeglm")
+BiocManager::install("clusterProfiler", version = "3.14", force = TRUE)
+BiocManager::install("pathview", force = TRUE)
+BiocManager::install("enrichplot", force = TRUE)
+BiocManager::install("EnhancedVolcano")
+```
+
+
+```{r, include=FALSE}
+library("recount3")
+library("dplyr")
+library("DESeq2")
+library("ggplot2")
+library("ReportingTools")
+library("pheatmap")
+library("ggrepel")
+library("pheatmap")
+library("RColorBrewer")
+library("tidyr")
+library("magrittr")
+library("stringr")
+library("fgsea")
+library("vsn")
+library("EnhancedVolcano")
+library("VennDiagram")
+require(reshape2)
+library(clusterProfiler)
+library(enrichplot)
+require(DOSE)
+library(dabestr)
+```
+
+
+**First Step is to read in data**
+
+```{r, include=FALSE}
+## read in
+
+readcounts <- read.csv("C:\\Users\\alex\\gobi2021\\Block\\Project3\\project3_raw.readcounts.csv", sep = ",")
+readcounts <- as.data.frame(readcounts)
+#dim(readcounts)
+#head(readcounts)
+
+sampleinfo <- read.csv("C:\\Users\\alex\\gobi2021\\Block\\Project3\\project3.sample_info.csv", sep = ",")
+sampleinfo <- as.data.frame(sampleinfo)
+
+
+umicounts <- read.csv("C:\\Users\\alex\\gobi2021\\Block\\Project3\\project3_raw.umicounts.csv", sep = ",")
+umicounts <- as.data.frame(umicounts)
+
+geneNames <- read.csv("C:\\Users\\alex\\gobi2021\\Block\\Project3\\project3.gene_names.txt", sep = "\t")
+geneNames <- as.data.frame(geneNames)
+
+#merged readcounts
+merged <- merge(readcounts, geneNames, by.x = "ï..ENSEMBL", by.y = "gene_id")
+merged <- merged[,-1]
+merged <- merged %>% relocate("gene_name")
+
+x <- make.names(merged$gene_name,unique=T)
+merged$gene_name <- x
+#sum(duplicated(merged$gene_name)) 
+
+#merged umicounts
+mergedumi <- merge(umicounts, geneNames, by.x = "ï..ENSEMBL", by.y = "gene_id")
+mergedumi <- mergedumi[,-1]
+mergedumi <- mergedumi %>% relocate("gene_name")
+
+y <- make.names(mergedumi$gene_name, unique=T)
+mergedumi$gene_name <-y
+#sum(duplicated(mergedumi$gene_name))
+
+```
+
+
+```{r, tidy=TRUE, warning=FALSE}
+#DESeq2 readcounts
+#----------------------------
+norm <- DESeqDataSetFromMatrix(
+  countData <- merged,
+  colData <- sampleinfo[,c(2,5)],
+  design = ~ Condition, tidy = TRUE)
+```
+
+Apply DESeq
+
+```{r, echo=FALSE, include=FALSE}
+reg <- DESeq(norm)
+```
+
+```{r}
+head(reg)
+```
+
+Add factor columns for WT/KO and M1/M2
+
+```{r, echo=FALSE}
+reg$cellType <- grepl("M1",reg$Condition)
+reg$factor <- grepl("WT",reg$Condition)
+reg$cellType <- as.character(reg$cellType)
+reg$factor <- as.character(reg$factor)
+
+reg$cellType <- str_replace_all(reg$cellType, "TRUE", "M1")
+reg$cellType <- str_replace_all(reg$cellType, "FALSE", "M2")
+reg$factor <- str_replace_all(reg$factor, "TRUE", "WT")
+reg$factor <- str_replace_all(reg$factor, "FALSE", "KO")
+colData(reg)
+```
+
+Results
+
+```{r, include=FALSE}
+res <- results(reg)
+```
+
+```{r}
+summary(res)
+```
+
+Order by Padj scores
+
+```{r}
+res <- res[order(res$padj),]
+head(res)
+```
+
+
+```{r, include=FALSE}
+# add a column of NAs
+res$diffexpressed <- "NO"
+# if log2Foldchange > 0.6 and pvalue < 0.05, set as "UP" 
+res$diffexpressed[res$log2FoldChange > 2 & res$pvalue < 0.05] <- "UP"
+# if log2Foldchange < -0.6 and pvalue < 0.05, set as "DOWN"
+res$diffexpressed[res$log2FoldChange < -2 & res$pvalue < 0.05] <- "DOWN"
+#res$diffexpressed
+
+#row.names(res)
+
+res$reslabel <- NA
+res$reslabel[res$diffexpressed != "NO"] <- row.names(res)[res$diffexpressed != "NO"]
+#res$reslabel
+
+#UMI 
+umiDeseq <- DESeqDataSetFromMatrix(
+  umicountData <- mergedumi,
+  umicolData <- sampleinfo[,c(2,5)],
+  design = ~ Condition, tidy = TRUE)
+
+umi <- DESeq(umiDeseq)
+#head(umi)
+
+resUMI <- results(umi)
+#summary(resUMI)
+
+resUMI <- resUMI[order(resUMI$padj),]
+#head(resUMI)
+
+#volcano plot
+# add a column of NAs
+resUMI$diffexpressed <- "NO"
+# if log2Foldchange > 0.6 and pvalue < 0.05, set as "UP" 
+resUMI$diffexpressed[resUMI$log2FoldChange > 2 & resUMI$pvalue < 0.05] <- "UP"
+# if log2Foldchange < -0.6 and pvalue < 0.05, set as "DOWN"
+resUMI$diffexpressed[resUMI$log2FoldChange < -2 & resUMI$pvalue < 0.05] <- "DOWN"
+
+#row.names(resUMI)
+resUMI$reslabelUMI <- NA
+resUMI$reslabelUMI[resUMI$diffexpressed != "NO"] <- row.names(resUMI)[resUMI$diffexpressed != "NO"]
+#resUMI$reslabelUMI
+
+```
+
+
+```{r, echo = FALSE}
+#split into M1 and M2
+
+m1in <- merged[,c(1,3,4,6,11,12,13,14,17,20,21,22,23)]
+m2in <- merged[,c(1,2,5,7,8,9,10,15,16,18,19,24,25)]
+
+m1sample <- sampleinfo[grepl("M1", sampleinfo$Sample_ID), ]
+m2sample <- sampleinfo[grepl("M2", sampleinfo$Sample_ID), ]
+
+m1des <- DESeqDataSetFromMatrix(
+  countData <- m1in,
+  colData <- m1sample[,c(2,5)],
+  design = ~ Condition, tidy = TRUE)
+
+m2des <- DESeqDataSetFromMatrix(
+  countData <- m2in,
+  colData <- m2sample[,c(2,5)],
+  design = ~ Condition, tidy = TRUE)
+
+m1reg <- DESeq(m1des)
+m2reg <- DESeq(m2des)
+
+m1res <- results(m1reg)
+m2res <- results(m2reg)
+
+# add a column of NAs
+m1res$diffexpressed <- "NO"
+m2res$diffexpressed <- "NO"
+# if log2Foldchange > 0.6 and pvalue < 0.05, set as "UP" 
+m1res$diffexpressed[m1res$log2FoldChange > 2 & m1res$pvalue < 0.05] <- "UP"
+m2res$diffexpressed[m2res$log2FoldChange > 2 & m2res$pvalue < 0.05] <- "UP"
+# if log2Foldchange < -0.6 and pvalue < 0.05, set as "DOWN"
+m1res$diffexpressed[m1res$log2FoldChange < -2 & m1res$pvalue < 0.05] <- "DOWN"
+m2res$diffexpressed[m2res$log2FoldChange < -2 & m2res$pvalue < 0.05] <- "DOWN"
+
+m1res$reslabel <- NA
+m2res$reslabel <- NA
+m1res$reslabel[m1res$diffexpressed != "NO"] <- row.names(m1res)[m1res$diffexpressed != "NO"]
+m2res$reslabel[m2res$diffexpressed != "NO"] <- row.names(m2res)[m2res$diffexpressed != "NO"]
+
+```
+
+
+**Volcano Plot**
+
+```{r, message=FALSE, fig.height=8, fi.width=6}
+#All
+EnhancedVolcano(res, lab=rownames(res), x = "log2FoldChange", y = "pvalue" )
+
+#M1
+EnhancedVolcano(m1res, lab=rownames(m1res), x = "log2FoldChange", y = "pvalue" )
+
+#M2 
+EnhancedVolcano(m2res, lab=rownames(m2res), x = "log2FoldChange", y = "pvalue" )
+
+#UMI
+EnhancedVolcano(resUMI, lab=rownames(resUMI), x = "log2FoldChange", y = "pvalue" )
+
+```
+
+
+```{r, echo=FALSE}
+
+readcounts[readcounts == 0] <- NA
+names <- colnames(readcounts[,-1])
+countSums <- colSums(na.rm = TRUE, readcounts[,-1])
+
+#split into WT or KO and label
+categories <- c("Knockout", "Knockout", "Wild Type","Knockout", "Knockout", "Knockout", "Wild Type", "Knockout", "Wild Type","Wild Type", "Wild Type","Knockout", "Knockout","Wild Type", "Knockout", "Wild Type", "Knockout","Wild Type","Wild Type", "Knockout", "Knockout","Wild Type","Wild Type","Wild Type")
+counts <- data.frame(categories,names, countSums)
+
+WTcounts <- counts %>% filter(categories == "Wild Type")
+KOcounts <- counts %>% filter(categories == "Knockout")
+
+#UMI
+umicounts[umicounts == 0] <- NA
+uminames <- colnames(umicounts[,-1])
+umicountSums <- colSums(na.rm = TRUE, umicounts[,-1])
+#split into WT or KO and label
+categories <- c("Knockout", "Knockout", "Wild Type","Knockout", "Knockout", "Knockout", "Wild Type", "Knockout", "Wild Type","Wild Type", "Wild Type","Knockout", "Knockout","Wild Type", "Knockout", "Wild Type", "Knockout","Wild Type","Wild Type", "Knockout", "Knockout","Wild Type","Wild Type","Wild Type")
+countsUMI <- data.frame(categories, uminames, umicountSums)
+
+umiWTcounts <- countsUMI %>% filter(categories == "Wild Type")
+umiKOcounts <- countsUMI %>% filter(categories == "Knockout")
+
+```
+
+
+**Plot count distributions**
+
+```{r, echo=FALSE, fig.width=10, fig.height=6, fig.show="hold", out.width="50%"}
+ggplot(data = WTcounts, aes(x = names, y = countSums, fill = categories)) + geom_bar(stat = "identity") + theme_minimal() + scale_y_continuous(labels = function(x) format(x, scientific = FALSE)) + theme(text = element_text(size = 10), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+ggplot(data = KOcounts, aes(x = names, y = countSums, fill = categories)) + geom_bar(stat = "identity") + theme_minimal() + scale_y_continuous(labels = function(x) format(x, scientific = FALSE)) + theme(text = element_text(size = 10), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+```
+
+```{r, echo=FALSE, fig.width=10, fig.height=6, fig.show="hold", out.width="50%"}
+ggplot(data = umiWTcounts, aes(x = uminames, y = umicountSums, fill = categories)) + geom_bar(stat = "identity") + theme_minimal() + scale_y_continuous(labels = function(x) format(x, scientific = FALSE)) + theme(text = element_text(size = 10), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+ggplot(data = umiKOcounts, aes(x = uminames, y = umicountSums, fill = categories)) + geom_bar(stat = "identity") + theme_minimal() + scale_y_continuous(labels = function(x) format(x, scientific = FALSE)) + theme(text = element_text(size = 10), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+
+```{r, echo=FALSE}
+reg$Condition <- factor(reg$Condition, levels = c("KO_M1", "KO_M2", "WT_M1", "WT_M2"))
+res <- results(reg, contrast = c("Condition", "KO_M1", "KO_M2"))
+resLFC <- lfcShrink(reg, coef = "Condition_KO_M2_vs_KO_M1", type = "apeglm")
+resNorm <- lfcShrink(reg, coef = "Condition_KO_M2_vs_KO_M1", type = "normal")
+```
+
+**MA Plots**
+
+
+```{r, fig.width=10, fig.height=6}
+#Base MA plot
+#------------------------
+Ma <- plotMA(res, ylim = c( -2, 2))
+
+#Apeglm shrinkage estimator 
+#------------------------
+Ma <- plotMA(resLFC, ylim = c( -2, 2))
+
+#DESeq2 normal shrinkage estimator
+#------------------------
+Ma <- plotMA(resNorm, ylim = c( -2, 2))
+```
+
+
+
+```{r, echo=FALSE}
+vsd <- vst(reg, blind=FALSE)
+rld <- rlog(reg, blind=FALSE)
+ntd <- normTransform(norm)
+```
+
+**Variance Plots**
+
+```{r, fig.width=10, fig.height=10}
+#Mean/SD Normal transform
+#------------------------
+meanSdPlot(assay(ntd))
+#Mean/SD Variance stabilizing transformation
+#------------------------
+meanSdPlot(assay(vsd))
+#Mean/SD Regularized log transform
+#------------------------
+meanSdPlot(assay(rld))
+```
+
+```{r, include=FALSE}
+#PCA
+count_rlog = rlogTransformation(reg)
+KOcounts <- count_rlog[,c(1,2,4,5,6,8,12,13,15,17,20,21)]
+WTcounts <- count_rlog[,c(3,7,9,10,11,14,16,18,19,22,23,24)]
+pcaplot <- plotPCA(count_rlog, intgroup = "Sample_ID", returnData=TRUE)
+percentVar <- round(100 * attr(pcaplot, "percentVar"))
+```
+
+
+**Heatmaps **
+
+```{r, tidy=TRUE, fig.width=10, fig.height=10}
+#Heatmaps
+#------------------------
+#NORM
+select <- order(rowMeans(counts(reg,normalized=TRUE)),
+                decreasing=TRUE)[1:20]
+df <- as.data.frame(colData(reg)[,c("cellType","factor")])
+pheatmap(assay(ntd)[select,], cluster_rows=FALSE, show_rownames=TRUE,
+         cluster_cols=FALSE, annotation_col=df, fontsize = 20)
+#VSD
+select <- order(rowMeans(counts(reg,normalized=TRUE)),
+                decreasing=TRUE)[1:20]
+df <- as.data.frame(colData(reg)[,c("cellType","factor")])
+pheatmap(assay(vsd)[select,], cluster_rows=FALSE, show_rownames=TRUE,
+         cluster_cols=FALSE, annotation_col=df, fontsize = 20)
+#RLD
+select <- order(rowMeans(counts(reg,normalized=TRUE)),
+                decreasing=TRUE)[1:20]
+df <- as.data.frame(colData(reg)[,c("cellType","factor")])
+pheatmap(assay(rld)[select,], cluster_rows=FALSE, show_rownames=TRUE,
+         cluster_cols=FALSE, annotation_col=df, fontsize = 20)
+```
+**PCA**
+
+```{r, fig.width=10, fig.height=4}
+ggplot(pcaplot, aes(PC1, PC2, color=count_rlog$cellType, shape=count_rlog$factor)) +
+  geom_point(size=3) +
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  coord_fixed()
+```
+
+
+**Sample distances**
+
+```{r, echo=FALSE, fig.width=10, fig.height=10}
+# Sample distances
+sampleDists <- dist(t(assay(vsd)))
+
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- paste(vsd$cellType, vsd$factor, sep="-")
+colnames(sampleDistMatrix) <- paste(vsd$cellType, vsd$factor, sep="-")
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors, fontsize = 20)
+```
+
+
+
+```{r, include=FALSE}
+#DABEST
+plot_dabest <- function(input_df_dabest) {
+  input_df_dabest <- na.omit(input_df_dabest) # remove NA
+  
+  # Performing unpaired (two independent groups) analysis.
+  unpaired_mean_diff <- dabest(input_df_dabest, macrophage, log2FoldChange,
+                               idx = c("M1", "M2"),
+                               paired = FALSE)
+  
+  # Display the results in a user-friendly format.
+  #unpaired_mean_diff
+  # Compute the mean difference.
+  #mean_diff(unpaired_mean_diff)
+  
+  # Plotting the mean differences.
+  mean_diff(unpaired_mean_diff) %>% plot()
+  
+}
+
+## 1) select all significant genes from the entire data set
+m1res
+m2res
+#select only genes that were classified as significant earlier
+m1res$diffexpressed <- na_if(m1res$diffexpressed, "NO")
+m2res$diffexpressed <- na_if(m2res$diffexpressed, "NO")
+filteredm1 <- subset(m1res, !is.na(diffexpressed))
+filteredm2 <- subset(m2res, !is.na(diffexpressed))
+
+da_best_M1 <- data.frame(filteredm1$reslabel, filteredm1$log2FoldChange)
+da_best_M1$macrophage <- "M1"
+colnames(da_best_M1) <- c("gene", "log2FoldChange", "macrophage")
+da_best_M2 <- data.frame(filteredm2$reslabel, filteredm2$log2FoldChange)
+da_best_M2$macrophage <- "M2"
+colnames(da_best_M2) <- c("gene", "log2FoldChange", "macrophage")
+
+intersection <- merge(da_best_M1, da_best_M2, by="gene")
+intersection
+
+```
+
+```{r}
+draw.pairwise.venn(area1 = nrow(da_best_M1), area2 = nrow(da_best_M2), cross.area = nrow(intersection), lty = "blank", fill = c("pink","orange"))
+
+```
+
+
+
+
+
+
+
+
+
+
+**Cluster Profiler**
+
+```{r, include=FALSE}
+#Cluster profiling Data prep
+
+readcounts <- read.csv("C:\\Users\\alex\\gobi2021\\Block\\Project3\\project3_raw.readcounts.csv", sep = ",")
+readcounts <- as.data.frame(readcounts)
+
+readcounts$ï..ENSEMBL <- sub("\\..*$", "",readcounts$ï..ENSEMBL)
+readcounts$ï..ENSEMBL
+
+readcountids <- DESeqDataSetFromMatrix(
+  countData <- readcounts,
+  colData <- sampleinfo[,c(2,5)],
+  design = ~ Condition, tidy = TRUE)
+
+readids <- DESeq(readcountids)
+
+gseares <- results(readids)
+
+# add a column of NAs
+gseares$diffexpressed <- "NO"
+# if log2Foldchange > 0.6 and pvalue < 0.05, set as "UP" 
+gseares$diffexpressed[gseares$log2FoldChange > 2 & gseares$pvalue < 0.05] <- "UP"
+
+# if log2Foldchange < -0.6 and pvalue < 0.05, set as "DOWN"
+gseares$diffexpressed[gseares$log2FoldChange < -2 & gseares$pvalue < 0.05] <- "DOWN"
+
+gseares$reslabel <- NA
+gseares$reslabel[gseares$diffexpressed != "NO"] <- row.names(gseares)[gseares$diffexpressed != "NO"]
+#dim(gseares)
+
+gseares$diffexpressed <- na_if(gseares$diffexpressed, "NO")
+#gseares$diffexpressed
+filtered <- subset(gseares, !is.na(diffexpressed))
+#is.na(filtered$diffexpressed)
+#dim (filtered)
+
+#----------------------------
+#Cluster profiling
+
+# Mouse 
+organism = "org.Mm.eg.db"
+BiocManager::install(organism, character.only = TRUE)
+library(organism, character.only = TRUE)
+
+#need log2fold as svector
+original_gene_list <-filtered$log2FoldChange
+
+#name 
+names(original_gene_list) <- row.names(filtered)
+
+#omit NAs
+gene_list <- na.omit(original_gene_list)
+
+#sort in decreasing order !!!
+gene_list = sort(gene_list, decreasing = TRUE)
+
+```
+
+```{r, message=FALSE, warning=FALSE, fig.width=8, fig.height=8}
+
+gse <- gseGO(geneList=gene_list, 
+             ont ="ALL", 
+             keyType = "ENSEMBL", 
+             nPerm = 1000,
+             minGSSize = 5, 
+             maxGSSize = 100, 
+             pvalueCutoff = 0.05, 
+             verbose = TRUE, 
+             OrgDb = "org.Mm.eg.db", 
+             pAdjustMethod = "none")
+
+dotplot(gse, showCategory=10, split=".sign") + facet_grid(.~.sign)
+
+
+```
+
+```{r, include=FALSE, warning=FALSE}
+#emapplot(gse, showCategory = 10)
+#cnetplot(gse, categorySize="pvalue", foldChange=gene_list, showCategory = 2)
+```
+
+```{r, fig.width=12, fig.height=12}
+ridgeplot(gse) + labs(x = "enrichment distribution") + theme_minimal()
+```
+
+```{r}
+gseaplot(gse, by = "all", title = gse$Description[1], geneSetID = 1)
+```
+
+
+
+
+
+
+

@@ -1,0 +1,13 @@
+﻿Well_original,Sample_ID,Replicate,Animal,Condition,Tissue,Harvest Date,Well,Row,Column,Name,BC
+B4,let7b_KO_M2_2,2,335.73,KO_M2,bone marrow differentiated macrophages,01.07.2021,B12,B,12,E3V7_S1_B12,AACCACCGGCAA
+E4,let7b_KO_M2_5,5,335.73,KO_M2,bone marrow differentiated macrophages,01.07.2021,E12,E,12,E3V7_S1_E12,ATCCGATCCTGG
+D4,let7b_KO_M2_4,4,335.73,KO_M2,bone marrow differentiated macrophages,01.07.2021,D12,D,12,E3V7_S1_D12,ATGTTGGAGCTA
+B3,let7b_WT_M2_2,2,330.97,WT_M2,bone marrow differentiated macrophages,01.07.2021,B11,B,11,E3V7_S1_B11,CAGACAGCATAA
+F4,let7b_KO_M2_6,6,335.73,KO_M2,bone marrow differentiated macrophages,01.07.2021,F12,F,12,E3V7_S1_F12,CGAACCAATATG
+C3,let7b_WT_M2_3,3,330.97,WT_M2,bone marrow differentiated macrophages,01.07.2021,C11,C,11,E3V7_S1_C11,CTGGCGTTGCTA
+F3,let7b_WT_M2_6,6,330.97,WT_M2,bone marrow differentiated macrophages,01.07.2021,F11,F,11,E3V7_S1_F11,GTACAAGACGTG
+A4,let7b_KO_M2_1,1,335.73,KO_M2,bone marrow differentiated macrophages,01.07.2021,A12,A,12,E3V7_S1_A12,GTCAACAGAGAA
+C4,let7b_KO_M2_3,3,335.73,KO_M2,bone marrow differentiated macrophages,01.07.2021,C12,C,12,E3V7_S1_C12,TAGGAGTGCCAA
+E3,let7b_WT_M2_5,5,330.97,WT_M2,bone marrow differentiated macrophages,01.07.2021,E11,E,11,E3V7_S1_E11,TATTCCTGTAGG
+A3,let7b_WT_M2_1,1,330.97,WT_M2,bone marrow differentiated macrophages,01.07.2021,A11,A,11,E3V7_S1_A11,TGCTACCAACAA
+D3,let7b_WT_M2_4,4,330.97,WT_M2,bone marrow differentiated macrophages,01.07.2021,D11,D,11,E3V7_S1_D11,TGGTGGCGCTTA

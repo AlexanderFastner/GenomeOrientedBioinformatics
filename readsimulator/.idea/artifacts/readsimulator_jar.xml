@@ -1,0 +1,14 @@
+<component name="ArtifactManager">
+  <artifact type="jar" build-on-make="true" name="readsimulator:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/readsimulator_jar</output-path>
+    <root id="archive" name="readsimulator.jar">
+      <element id="module-output" name="readsimulator" />
+      <element id="extracted-dir" path="$USER_HOME$/Downloads/commons-cli-1.5.0-bin/commons-cli-1.5.0/commons-cli-1.5.0.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/Downloads/commons-cli-1.5.0-bin/commons-cli-1.5.0/commons-cli-1.5.0-tests.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/Downloads/commons-cli-1.5.0-bin/commons-cli-1.5.0/commons-cli-1.5.0-javadoc.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/Downloads/commons-cli-1.5.0-bin/commons-cli-1.5.0/commons-cli-1.5.0-sources.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/Downloads/commons-cli-1.5.0-bin/commons-cli-1.5.0/commons-cli-1.5.0-test-sources.jar" path-in-jar="/" />
+      <element id="module-source" name="readsimulator" />
+    </root>
+  </artifact>
+</component>
