@@ -10,7 +10,7 @@ Main topics include:
 4. Differential Analysis  
 5. GO enrichment  
 
-Also includes a Capstone Project with a full [Report](https://github.com/AlexanderFastner/GenomeOrientedBioinformatics/Blockteil_PaperGruppe7.pdf).
+Also includes a Capstone Project with a full [Report](https://github.com/AlexanderFastner/GenomeOrientedBioinformatics/blob/main/Blockteil_PaperGruppe7.pdf).
 
-Project Prompt can be read here [Problem](https://github.com/AlexanderFastner/GenomeOrientedBioinformatics/Block/READ.ME).
+Project Prompt can be read here [Problem](https://github.com/AlexanderFastner/GenomeOrientedBioinformatics/tree/main/Block/READ.ME).
 
